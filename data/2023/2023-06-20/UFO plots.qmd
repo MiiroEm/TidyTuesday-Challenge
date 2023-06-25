@@ -11,7 +11,7 @@ format:
     code-tools: true
     code-summary: "Show the code"
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 ```{r}
@@ -138,6 +138,7 @@ We plot the world map filled with colors proportional to the frequency of sighti
 ```{r}
 #| label: maps-world
 #| fig-cap: "Frequency of sightings of UFOs across the world."
+#| fig-subcap: "The colors scale is proportional to the natural logarithm of the frequency of reports of UFO sightings with yellow highest and blue lowest"
 #| fig-alt: "A world map showing the frequency of sightings of Unidentified Flying Objects (UFOs) across the world. The United States of America and Alaska have the highest frequency of reported UFOs sightings."
 Ufo_country <- ufo_sightings |> 
   group_by(country_code) |> 
@@ -146,9 +147,9 @@ Ufo_country <- ufo_sightings |>
 ufo_countries_sf <- world |> left_join(Ufo_country, by = join_by(postal == country_code))
 
 ggplot(data = world) +
-    geom_sf(data = ufo_countries_sf, aes(fill = n)) +
+    geom_sf(data = ufo_countries_sf, aes(fill = log(n))) +
     scale_fill_viridis_c(option = "plasma") +
-  labs(fill = "Frequency")
+  labs(title = stringr::str_wrap("Map of the world showing countries with reported sightings of Unidentified Flying Objects (UFOs)", width = 80), subtitle = stringr::str_wrap("The colors are proportional to the natural logarithm of the frequency of reports.", width = 90) ,caption = "Data: Sightings of UFOs 2023 | Graphic: @Emmanuelmiiro25", fill = "Frequency (logarithm)")
   
 ```
 
@@ -157,11 +158,16 @@ Most of reports of UFOs sightings are from the United States of America (USA) an
 ```{r}
 #| label: maps-world-log-transformed
 #| fig-cap: "Frequency of sightings of UFOs across the world applying a log transformation"
-#| fig-alt: "A world map showing the log frequency of sightings of Unidentified Flying Objects (UFOs) across the world. In addition to the United States of America and Alaska, Canada and Australia also have relatively high frequency of reported UFOs sightings."
+#| fig-alt: "A world map showing the log frequency of sightings of Unidentified Flying Objects (UFOs) across the world. In addition to the United States of America and Alaska, Britain and Australia also have relatively high frequency of reported UFOs sightings."
+
+# create a sf_object for plotting location of sightings
+places_world_sf <- places |> st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
 ggplot(data = world) +
-    geom_sf(data = ufo_countries_sf, aes(fill = log(n))) +
-    scale_fill_viridis_c(option = "plasma") +
-  labs(fill = "Frequency (logarithm)") 
+  geom_sf(data = ufo_countries_sf, aes(fill = log(n))) +
+  scale_fill_viridis_c(option = "plasma") +
+  geom_sf(data = places_world_sf, size = 1, shape = 19) +
+  labs(title = stringr::str_wrap("Map of the world showing countries with reported sightings of Unidentified Flying Objects (UFOs)", width = 80), subtitle = stringr::str_wrap("The colors are proportional to the natural logarithm of the frequency of reports. Dark dots are the locations where UFOs were sighted.", width = 90) ,caption = "Data: Sightings of UFOs 2023 | Graphic: @Emmanuelmiiro25", fill = "Frequency (logarithm)") 
 
 ```
 
@@ -212,16 +218,15 @@ countries_sf_centroids$nudge_X[countries_sf_centroids$name == "South Africa"] <-
 # plot
 ggplot(data = ufo_africa_sf) +
   geom_sf(aes(fill = log(n))) +
-  geom_sf(data = places_sf, size = 1, shape = 19) +
+  geom_sf(data = places_sf, size = 1, shape = 19, alpha = 0.6) +
   scale_fill_viridis_c(option = "plasma") +
   geom_label_repel(data = countries_sf_centroids, aes(X, Y, label = name), size = 1.8, nudge_x = countries_sf_centroids$nudge_X) +
-  labs(title = stringr::str_wrap("Map of Africa showing the countries with reported sightings of Unidentified Flying Objects (UFOs)", width = 80), subtitle = stringr::str_wrap("The colors are proportional to the natural logarithm of the frequency of reports. Dark dots are the locations where UFOs were sighted. Labels are the country names.", width = 90) ,caption = "Data: Sightings of UFOs 2023 | Graphic: @Emmanuelmiiro25", fill = "Frequency (logarithm)") +
+  labs(title = stringr::str_wrap("Map of Africa showing the countries with reported sightings of Unidentified Flying Objects (UFOs)", width = 80), subtitle = stringr::str_wrap("The colors are proportional to the natural logarithm of the frequency of reports. Dark dots represent cities where UFOs were sighted. Labels are the country names.", width = 90) ,caption = "Data: Sightings of UFOs 2023 | Graphic: @Emmanuelmiiro25", fill = "Frequency (logarithm)") +
   xlab("Longitude") + 
   ylab("Latitude") +
   annotation_north_arrow(location = "bl", which_north = "true", 
         pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
         style = north_arrow_fancy_orienteering)
-  
   
 ```
 South Africa has the highest number of reports of sightings of UFOs, followed by Egypt. Interestingly, the relatively small island of Cape Verde also reported sighting a UFO!
@@ -234,6 +239,30 @@ The table below shows the top 5 African countries with the most sightings of UFO
 ufo_africa |> mutate(country_name = xfun::attr(africa_codes[africa_codes %in% ufo_africa$country_code], which = "names")) |> arrange(desc(n)) |> head(5) |> kable()
 ```
 
-That's it for this week's /#TidyTuesday.
 
+## Are sightings of UFOs related to a country's population or elevation?
+### Relationship to a city's elevation
+```{r}
+#| label: elevation-relationship
+#| warning: false
+#| fig-cap: Relationship between a city's elevation and it's number of reported sightings of Unidentified Flying Objects (UFOs).
+#| fig-alt: A scatter plot showing the number of reported sightings of Unidentified Flying Objects (UFOs) on the y-axis plotted against the elevation of the city on the x-axis. There is no obvious relationship between a city's elevation and it's reported sightings of UFOs.
+ufo_city_elevated <- ufo_sightings |> group_by(city) |> summarise(n = n()) |> left_join(places, by = "city")
+
+ggplot(ufo_city_elevated, aes(elevation_m, n)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  ylab("number of UFO sightings") + xlab("Elevation (metres)")
+```
+There's no obvious relationship between elevation and the number of sightings of UFOs
+
+### Relationship to a city's population
+```{r}
+#| label: population-UFOs
+#| fig-cap: A scatter plot of the logarithm of the population of cities and their number of sightings of UFOs
+#| fig-alt: A scatter plot showing the relationship between a city's population and the number of reported sightings of UFOs. The population is transformed by a logarithm. No obvious relationship between a city's population and the number of reported UFO sightings.
+ggplot(ufo_city_elevated, aes(log(population), n)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  xlab("Log_population") + ylab("number of UFO sightings")
+```
+There's no obvious relationship between a city's population and it's reports of UFO sightings.
 
