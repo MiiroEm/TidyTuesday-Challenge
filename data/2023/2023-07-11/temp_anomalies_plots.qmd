@@ -1,0 +1,269 @@
+---
+title: "Global surface temperature anomalies"
+author: "Miiro Emmanuel, MD."
+format: 
+  html:
+     code-fold: true
+     code-overflow: wrap
+     code-summary: "show computer code"
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Get set. Go
+
+Let us set up our working environment by loading the required packages.
+
+```{r}
+#| label: set-up 
+#| results: hide
+#| warning: false
+#| message: false
+
+library(tidyverse)
+library(ggtext)
+library(showtext)
+showtext_auto()
+# if the data is not yet saved in your working directory, get it from here: 
+# tuesdata <- tidytuesdayR::tt_load('2023-07-11')
+# global_temps <- tuesdata$global_temps
+global_temp <- read.csv(here::here(
+    "data",
+    "2023",
+    "2023-07-11",
+    "global_temps.csv"
+  ))
+nh_temp <- read.csv(here::here(
+    "data",
+    "2023",
+    "2023-07-11",
+    "nh.csv"
+  ))
+sh_temp <- read.csv(here::here(
+    "data",
+    "2023",
+    "2023-07-11",
+    "sh_temps.csv"
+  ))
+zonann_temps <- read.csv(here::here(
+                   "data",
+                   "2023",
+                   "2023-07-11",
+                   "zonann_temps.csv"
+                 ))
+```
+
+# About the data, anomalies and where to get further information
+
+This data comes from [NASA GISS Surface Temperature Analysis (GISTEMP v4)](https://data.giss.nasa.gov/gistemp/). It shows global and hemispheric monthly means and zonal annual means. It was supplied as part of the weekly **R** [TidyTuesday challenge](https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-07-11/readme.md). The temperatures are anomalies for that month and region where the baseline is the averaged temperature for that place from 1951 to 1980. For more information about what the anomalies are and how they are computed, see their [FAQs](https://data.giss.nasa.gov/gistemp/faq/). For the detailed methodology, see their paper: Lenssen et al., 2019: Improvements in the GISTEMP uncertainty model. J. Geophys. Res. Atmos., 124, no. 12, 6307-6326, doi:10.1029/2018JD029522.\
+The dataset can be cited as: GISTEMP Team, 2023: GISS Surface Temperature Analysis (GISTEMP), version 4. NASA Goddard Institute for Space Studies. Dataset originally accessed 2023-07-09 at <https://data.giss.nasa.gov/gistemp/>.
+
+# Visualizing global temperature anomalies
+
+Here, I create a bar graph of temperature anomalies for the past 50 years. 2023 is excluded because its data is incomplete. Warmer months (with positive anomalies) are colored yellow while colder months (negative temperature anomalies) are colored dark.
+
+```{r}
+#| label: global-temp-anomalies
+#| warning: false
+#| message: false
+#| fig-width: 9
+#| fig-height: 6
+#| fig-dpi: 300
+
+# create a narrower table; categorize anomalies; 2023 has incomplete data so leave it out. Take the last 50 years.
+global_temp_narrow <- pivot_longer(global_temp, values_to = "Temperature", names_to = "Month", cols = Jan:Dec) |> select(Year, Month, Temperature) |> mutate(Feel = case_when(Temperature > 0 ~ "Warmer", Temperature < 0 ~ "Colder", Temperature == 0 ~ "Normal")) |> filter(Year >= 1973 & Year < 2023)
+
+# load the font to use
+font_add_google("Lora", "lora")
+
+# making the plot begins here
+title <- toupper("Global surface Temperature anomalies over the past 50 years")
+subtitle <- stringr::str_wrap("Over the past 50 years, there has been progressive global warming, especially so from the late 20th century. This plot shows that almost all months since 1980 have been warmer than the historical baseline period of 1951 to 1980. Furthermore, the magnitude of the warming has increased in recent decades.", width = 120)
+caption <- "Data source:GISTEMP Team, 2023: GISS Surface Temperature Analysis (GISTEMP), version 4. NASA Goddard Institute for Space Studies | Plot: <span style='font-family:fa-brands'>&#xf099;</span> @Emmanuelmiiro25"
+
+p1 <- ggplot(global_temp_narrow, aes(x = Month, y = Temperature, fill = Feel)) +
+  geom_col()
+p2 <- p1 + facet_wrap(~ Year, ncol = 10)
+p3 <- p2 + scale_fill_viridis_d(option = "E", name = "Anomaly")
+# the above 3 lines of code are the major elements of this plot. What follows is icing on the cake.
+
+# the modifications of theme here are to remove extraneous plot elements and allow the data to stand out. Similar to ggplot::theme_classic()
+p4 <- p3 + scale_x_discrete(name = "Month of the Year", guide = "none") + scale_y_continuous(name = "Temperature anomaly (<sup>0</sup>)") + labs(title = title, subtitle = subtitle, caption = caption)
+p5 <- p4 + theme(
+  text = element_text(family = "lora"),
+  axis.title = element_text(size = 14, colour = "black"),
+  axis.text = element_text(size = 11),
+  axis.ticks.y.left = element_line(colour = "black", linewidth = .2),
+  axis.text.y.left = element_text(face = "bold"), 
+  axis.title.y = element_markdown(),
+  axis.line.y.left = element_line(colour = "black", linewidth = .2, linetype = "solid"), 
+  plot.caption = element_markdown(hjust = .5, size = 12),
+  plot.title = element_markdown(size = 22, hjust = .5),
+  plot.subtitle = element_text(size = 16),
+  panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  strip.background = element_rect(fill = "white", colour = "black", linewidth = rel(2)),
+  strip.text = element_text(face = "bold"),
+  panel.grid.minor = element_blank(), 
+  plot.background = element_rect(fill = "transparent", colour = "transparent"),
+  panel.background = element_rect(colour = "transparent", fill = "transparent"))
+
+# create a horizontal bar line at temp = 0
+p6 <- p5 + geom_hline(yintercept = 0)
+p6
+```
+
+## Miscellaneous: How to add font icons from fontawesome
+
+It took me a while to figure out how to add a twitter icon into the plot caption. The font icons are available from [Frontawesome](https://fontawesome.com/icons). To use them locally, download the desktop version of [fontawesome](https://fontawesome.com/download). Extract the files to your working directory then import the fonts via `sysfonts::font_add()` whose first argument is the font family name, whilst the second argument is the path to the .otf file. Make sure to specify the path to the .otf-files correctly. To check if the fonts have become available, run `sysfonts::font_families()`. Credit to Albert Rapp for his [tutorial](https://albert-rapp.de/posts/ggplot2-tips/08_fonts_and_icons/08_fonts_and_icons.html). The code below is illustrative of my device.
+
+```{r}
+#| label: font-icons
+#| eval: true
+
+# download the zipped fontawesome folder, extract it to your working directory, then: 
+
+font_add('fa-reg', "data/fontawesome-free-6.4.0-desktop/otfs/Font Awesome 6 Free-Regular-400.otf") # first argument is family name, second argument is the path to the location of the .otf
+
+font_add('fa-brands', "data/fontawesome-free-6.4.0-desktop/otfs/Font Awesome 6 Brands-Regular-400.otf")
+
+font_add('fa-solid', "data/fontawesome-free-6.4.0-desktop/otfs/Font Awesome 6 Free-Solid-900.otf")
+# after that the font icons will be available in your system fonts.
+
+sysfonts::font_add_google("IBM Plex Mono", "IBM Plex Mono")
+```
+
+Goodbye.
+
+# Plotting global moving averages
+
+The code is adapted from this tutorial [here](https://datacornering.com/plot-moving-average-in-r-using-ggplot2/?s=35). Only the third plot was posted on twitter. So I'm commenting-out the first two. I'm leaving the code because I may need to refer to it in the future.
+
+```{r}
+#| label: moving-average
+global_temp_roll <- pivot_longer(global_temp, values_to = "Temperature", names_to = "Month", cols = Jan:Dec) |> select(Year, Month, Temperature)
+
+
+
+# font_add_google("Nunito", "nunito")
+# install.packages("zoo")
+library(zoo) # for the rollmean()
+
+# ggplot(global_temp_roll, aes(x = Year, y = Temperature)) +
+#   geom_line(color = "cadetblue", linewidth = 1) +
+#   geom_line(aes(y = rollmean(
+#     Temperature, 12, na.pad = TRUE, align = "right")), linewidth = 1) + 
+#   theme_minimal() +
+#   theme(
+#     text = element_text(family = "nunito")
+#   )
+
+# add ribbons to the plot: creepy plot. lol.
+# first calculate rolling mean
+global_temp_roll$MA <- rollmean(global_temp_roll$Temperature, 12, na.pad = TRUE, align = "right")
+# 
+# global_temp_roll$above_MA <- ifelse(global_temp_roll$Temperature >= global_temp_roll$MA, global_temp_roll$Temperature, global_temp_roll$MA)
+# global_temp_roll$below_MA <- ifelse(global_temp_roll$Temperature < global_temp_roll$MA, global_temp_roll$Temperature, global_temp_roll$MA)
+# 
+# ggplot(global_temp_roll, aes(x = Year,
+#                y = MA)) +
+#   geom_line(color = "cadetblue",
+#             linewidth = 1,
+#             linetype = 2) +
+#   geom_ribbon(aes(ymin = below_MA, ymax = MA),
+#               alpha = 0.2,
+#               fill = "tomato") +
+#   geom_ribbon(aes(ymin = MA, ymax = above_MA),
+#               alpha = 0.2,
+#               fill = "steelblue") +
+#   theme_minimal() +
+#   theme(axis.title = element_blank(),
+#         text = element_text(family = "nunito"))
+
+# add actual data points behind the moving average
+global_temp_roll$diff <- global_temp_roll$Temperature - global_temp_roll$MA # we shall color the points by how much they are below or above the moving average
+
+ggplot(global_temp_roll, aes(x = Year, y = MA)) +
+  geom_point(aes(x = Year, y = Temperature, color = diff), size = 2, shape = 16) +
+  scale_colour_gradient2(midpoint = 0, low = "tomato", high = "steelblue", na.value = "transparent", guide = "none") +
+  geom_line(color = "cadetblue", linewidth = 1) +
+  labs(title = "GLOBAL SURFACE TEMPERATURE ANOMALIES MOVING AVERAGE",
+       subtitle = str_wrap("This plot shows the moving (rolling) average of the global surface temperature anomalies data. The dots are data points colored by their distance from the moving average. The plot shows a steady increase in the average global surface temperature for since 1880.", width = 140),
+       caption = "Data source:GISTEMP Team, 2023: GISS Surface Temperature Analysis (GISTEMP), version 4. NASA Goddard Institute for Space Studies | Plot: <span style='font-family:fa-brands'>&#xf099;</span> @Emmanuelmiiro25",
+       x = "Year",
+       y = "Moving average temperature ((<sup>o</sup>))")
+  theme_classic() +
+  theme(text = element_text(family = "nunito"),
+        plot.title = element_text(size = 22, hjust = .5),
+        plot.subtitle = element_text(size = 16),
+        plot.caption = element_markdown(size = 9),
+        axis.text = element_markdown())
+```
+# Plotting zonal temperature anomalies
+
+```{r}
+#| label: zonal-temps
+
+# zonann_temps <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-07-11/zonann_temps.csv')
+zonann_temps_df <- zonann_temps |> pivot_longer(cols = X24N.90N:X90S.64S, names_to = "latitude_pair", values_to = "Temperature")
+
+# Load the required libraries
+library(maps) # library(tidyverse)
+
+# latitudes came in pairs
+latitude_pairs <- zonann_temps_df$latitude_pair
+temperatures <- zonann_temps_df$Temperature 
+
+# Extract start latitude, end latitude, and hemisphere indicator using regex
+pattern <- "^X(\\d+)([NS])\\.(\\d+)([NS])$"
+matches <- str_match(latitude_pairs, pattern)
+
+start_latitude <- as.numeric(matches[, 2])
+start_hemisphere <- matches[, 3]  # Use index to access the hemisphere indicator
+end_latitude <- as.numeric(matches[, 4])
+end_hemisphere <- matches[, 5]  # Use index to access the hemisphere indicator
+
+# Convert 'S' and 'N' to negative and positive, respectively, for each latitude
+end_latitude <- ifelse(end_hemisphere == "S", -end_latitude, end_latitude)
+start_latitude <- ifelse(start_hemisphere=="S", -start_latitude, start_latitude)
+# Create a data frame for mapping
+data <- data.frame(
+  latitude_start = start_latitude,
+  latitude_end = end_latitude,
+  temperature = temperatures
+)
+
+# Get the world map data
+world <- map_data("world")
+
+# Create a data frame for polygons with latitude regions
+polygons <- data.frame(
+  x = c(-180, 200, 200, -180),
+  y = c(rep(start_latitude, each = 2), rep(end_latitude, each = 2)),
+  group = rep(1:length(latitude_pairs), each = 2),
+  temperature = rep(temperatures, each = 2)
+)
+
+# Create a choropleth world map using ggplot2
+ggplot() +
+  geom_polygon(data = polygons, aes(x = x, y = y, group = group, fill = temperature), color = "black", alpha = 1/10) +
+  scale_fill_viridis_c(name = "Temperature (<sup>0</sup>)", option = "plasma", alpha = 5/10) +
+  geom_polygon(data = world, aes(x = long, y = lat, group = group), color = "black", fill = "white", alpha = 3/10) + 
+  labs(title= "GLOBAL SURFACE TEMPERATURE ANOMALIES",
+       subtitle = str_wrap("This plot shows a world map with colors that reflect temperature anomalies. The horizontal lines are latitudes. The northen part of the world appears to getting be especially hotter compared to the rest of the world.", width = 100),
+       x = "Longitude",
+       y = "Latitude",
+       caption = "Data source:GISTEMP Team, 2023: GISS Surface Temperature Analysis (GISTEMP), version 4. NASA Goddard Institute for Space Studies | Plot: <span style='font-family:fa-brands'>&#xf099;</span> @Emmanuelmiiro25") +
+  theme_classic() +
+  theme(text = element_text(family = "IBM Plex Mono"),
+        plot.title = element_text(size = 22, hjust = .5),
+        plot.subtitle = element_text(size = 16),
+        plot.caption = element_markdown(size = 9),
+        legend.title = element_markdown())
+
+ggsave("Global_surface_anomalies_world_map.png", dpi = 600, path = here::here("data", "2023", "2023-07-11"))
+```
+
+
+

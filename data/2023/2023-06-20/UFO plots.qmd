@@ -137,9 +137,9 @@ We plot the world map filled with colors proportional to the frequency of sighti
 
 ```{r}
 #| label: maps-world
-#| fig-cap: "Frequency of sightings of UFOs across the world."
-#| fig-subcap: "The colors scale is proportional to the natural logarithm of the frequency of reports of UFO sightings with yellow highest and blue lowest"
-#| fig-alt: "A world map showing the frequency of sightings of Unidentified Flying Objects (UFOs) across the world. The United States of America and Alaska have the highest frequency of reported UFOs sightings."
+#| fig-cap: Frequency of sightings of UFOs across the world.
+#| fig-subcap: The colors scale is proportional to the natural logarithm of the frequency of reports of UFO sightings with yellow highest and blue lowest.
+#| fig-alt: A world map showing the frequency of sightings of Unidentified Flying Objects (UFOs) across the world. The United States of America and Alaska have the highest frequency of reported UFOs sightings.
 Ufo_country <- ufo_sightings |> 
   group_by(country_code) |> 
   summarise(n = n())
@@ -157,8 +157,8 @@ Most of reports of UFOs sightings are from the United States of America (USA) an
 
 ```{r}
 #| label: maps-world-log-transformed
-#| fig-cap: "Frequency of sightings of UFOs across the world applying a log transformation"
-#| fig-alt: "A world map showing the log frequency of sightings of Unidentified Flying Objects (UFOs) across the world. In addition to the United States of America and Alaska, Britain and Australia also have relatively high frequency of reported UFOs sightings."
+#| fig-cap: Frequency of sightings of UFOs across the world applying a log transformation.
+#| fig-alt: A world map showing the log frequency of sightings of Unidentified Flying Objects (UFOs) across the world. In addition to the United States of America and Alaska, Britain and Australia also have relatively high frequency of reported UFOs sightings.
 
 # create a sf_object for plotting location of sightings
 places_world_sf <- places |> st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
