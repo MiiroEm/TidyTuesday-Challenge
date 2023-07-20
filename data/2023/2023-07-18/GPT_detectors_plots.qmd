@@ -1,0 +1,230 @@
+---
+title: "GPT detectors"
+author: "Miiro Emmanuel, MD."
+format: html
+editor: visual
+bibliography: references.bib
+editor_options: 
+  chunk_output_type: console
+---
+
+# GPT detectors
+
+The data comes from Liang et al's study[@liang2023]. The authors compare different Generative Pre-Trained (GPT) content detectors and find that they are systematically biased against non-native English writers. The data was shared as part of the 2023, week 29 [#Tidytuesday challenge](https://github.com/rfordatascience/tidytuesday/tree/master) and can be accessed [here](https://github.com/rfordatascience/tidytuesday/tree/master/data/2023/2023-07-18)
+
+## Get set. Go.
+
+set up our working environment
+
+```{r}
+#| label: set-up
+
+library(tidyverse)
+conflicted::conflicts_prefer(dplyr::filter)
+library(bbplot)
+library(showtext)
+library(ggtext)
+library(patchwork)
+
+gpt_detectors <- read.csv(here::here("data", "2023", "2023-07-18", "detectors.csv"))
+
+# add fonts
+# sysfonts::font_add_google("Crimson Pro", "Crimson Pro")
+# font_add_google("Mynerve", "Mynerve")
+font_add('fa-reg', "data/fontawesome-free-6.4.0-desktop/otfs/Font Awesome 6 Free-Regular-400.otf") # first argument is family name, second argument is the path to the location of the .otf
+
+font_add('fa-brands', "data/fontawesome-free-6.4.0-desktop/otfs/Font Awesome 6 Brands-Regular-400.otf")
+
+font_add('fa-solid', "data/fontawesome-free-6.4.0-desktop/otfs/Font Awesome 6 Free-Solid-900.otf")
+# after that the font icons will be available in your system fonts.
+
+font_add(family = "Segoe UI", regular = "segoeui.ttf", bold = "segoeuib.ttf", italic = "segoeuii.ttf")
+
+showtext_auto()
+
+```
+
+## Check the data
+
+```{r}
+#| label: check-data
+
+str(gpt_detectors) # 6185 obs of 9 variables
+
+unique(gpt_detectors$detector) # 7 unique detectors
+
+table(gpt_detectors$native, exclude = NULL) # a lot of NA's which correspond to AI written text
+
+table(gpt_detectors$name, exclude = NULL) # 10 tests were sourced some modified(simplified)
+
+table(gpt_detectors$model, exclude = NULL) # a lot of AI essays
+
+table(gpt_detectors$prompt, exclude = NA) # prompts used to generate AI written/modified essays
+
+```
+
+## Recode factors
+
+Change variables with character data type to factors.
+
+```{r}
+#| label: recode-data
+
+gpt_detectors <- gpt_detectors |> mutate(across(where(is.character),  as.factor))
+
+```
+
+## Visualizations
+
+I have decided to (sort of) reproduce the figures in the text, if the data needed is in the dataset.
+
+```{r}
+#| label: plots
+
+# wrangle the data to get variables of interest
+detectors_miss1 <-  gpt_detectors |> mutate(missclassified = ifelse(model == "Human" & .pred_class == "AI", TRUE, FALSE)) |> filter(name %in% c("Real TOEFL", "US 8th grade essay")) |> group_by(detector, name) |> summarise(prop_missed = mean(missclassified)*100) |> mutate(name = factor(name, levels = c("Real TOEFL", "US 8th grade essay")), detector = factor(detector, levels = c("ZeroGPT", "GPTZero", "Crossplag", "HFOpenAI", "Sapling", "Quil", "OriginalityAI")))
+
+m1 <- ggplot(detectors_miss1, aes(x = detector, y = prop_missed, fill = name)) +
+  geom_col(position = "dodge") + 
+  geom_text(aes(label=paste(round(prop_missed), "%")), position=position_dodge(width=0.9), hjust=-0.25) +
+  coord_flip() +
+  scale_y_continuous(name = "Human-Written Misclassified as AI-generated (%)", expand = c(.001,0), limits = c(0, 100), labels = scales::label_percent(scale = 1)) +
+  scale_fill_manual(values = c("darkred", "grey"))+
+  bbc_style() +
+  theme(legend.position = c(.85,.16), 
+        axis.title.y = element_blank(),
+        panel.border = element_rect(colour = "black", fill = NA), 
+        axis.ticks = element_line(colour = "black", linewidth = .7), axis.ticks.length = unit(1.7, "mm"),
+        panel.grid.major.y = element_blank(),
+        legend.text = element_text(size = 12))
+  
+
+# ggsave("x.jpg")
+# Repeat above workflow for Real TOEFL enhanced essays + Enhanced Word choices, Real US 8th grade essays + simplified word choices: maybe write a function? I don't feel like doing that hustle :)
+detectors_miss2 <-  gpt_detectors |> mutate(missclassified = ifelse(.pred_class == "AI", TRUE, FALSE)) |> filter(name %in% c("Fake TOEFL - GPT4 - PE", "US 8th grade essay - GPT simplify")) |> group_by(detector, name) |> summarise(prop_missed = mean(missclassified)*100) |> mutate(name = factor(name, levels = c("US 8th grade essay - GPT simplify", "Fake TOEFL - GPT4 - PE")), detector = factor(detector, levels = c("ZeroGPT", "GPTZero", "Crossplag", "HFOpenAI", "Sapling", "Quil", "OriginalityAI")))
+
+# plot
+m2 <- ggplot(detectors_miss2, aes(x = detector, y = prop_missed, fill = name)) +
+  geom_col(position = "dodge") + 
+  geom_text(aes(label=paste(round(prop_missed), "%")), position=position_dodge(width=0.9), hjust=-0.25) +
+  coord_flip() +
+  scale_y_continuous(name = "Human-Written Misclassified as AI-generated (%)", expand = c(.001,0), limits = c(0, 110), labels = scales::label_percent(scale = 1)) +
+  scale_fill_manual(values = c("grey", "darkred"), labels = c("Real TOEF Essays + Enhanced Word Choices", "Real US 8th-Grade Essays + Simplified Word Choices"))+
+  bbc_style() +
+  theme(legend.position = c(.75,.16), 
+        axis.title.y = element_blank(),
+        panel.border = element_rect(colour = "black", fill = NA), 
+        axis.ticks = element_line(colour = "black", linewidth = .7),
+        axis.text = element_text(size = 14),
+        axis.ticks.length = unit(1.7, "mm"),
+        panel.grid.major.y = element_blank(),
+        legend.text = element_text(size = 12)
+       )
+
+# plot correctly classified texts after wrangling the data
+detectors_correct1 <-  gpt_detectors |> mutate(true_positive = ifelse(model != "Human" & .pred_class == "AI", TRUE, FALSE)) |> filter(name %in% c("Fake College Essays - GPT3", "Fake College Essays - GPT3 Prompt Engineered")) |> group_by(detector, name) |> summarise(prop_correct = mean(true_positive)*100) |> mutate(name = factor(name, levels = c("Fake College Essays - GPT3", "Fake College Essays - GPT3 Prompt Engineered")), detector = factor(detector, levels = c("ZeroGPT", "GPTZero", "Crossplag", "HFOpenAI", "Sapling", "Quil", "OriginalityAI")))
+
+c1 <- ggplot(detectors_correct1, aes(x = detector, y = prop_correct, fill = name)) +
+  geom_col(position = "dodge") + 
+  geom_text(aes(label=paste(round(prop_correct), "%")), position=position_dodge(width=0.9), hjust=-0.25) +
+  coord_flip() +
+  scale_y_continuous(name = "Correctly classified as AI-generated (%)", expand = c(.001,0), limits = c(0, 110), labels = scales::label_percent(scale = 1)) +
+  scale_fill_manual(values = c("darkred", "grey"), labels = c("US College Admission Essays: ChatGPT-3.5 generated", "ChatGPT-3.5 w/ prompt design"))+
+  bbc_style() +
+  theme(legend.position = c(.75,.91), 
+        axis.title.y = element_blank(),
+        panel.border = element_rect(colour = "black", fill = NA), 
+        axis.ticks = element_line(colour = "black", linewidth = .7),
+        axis.text = element_text(size = 14),
+        axis.ticks.length = unit(1.7, "mm"),
+        panel.grid.major.y = element_blank(),
+        legend.text = element_text(size = 14)
+  )
+
+# plot scientific abstracts
+detectors_correct2 <-  gpt_detectors |> mutate(true_positive = ifelse(model != "Human" & .pred_class == "AI", TRUE, FALSE)) |> filter(name %in% c("Fake CS224N - GPT3", "Fake CS224N - GPT3, PE")) |> group_by(detector, name) |> summarise(prop_correct = mean(true_positive)*100) |> mutate(name = factor(name, levels = c("Fake CS224N - GPT3, PE", "Fake CS224N - GPT3")), detector = factor(detector, levels = c("ZeroGPT", "GPTZero", "Crossplag", "HFOpenAI", "Sapling", "Quil", "OriginalityAI")))
+
+c2 <- ggplot(detectors_correct2, aes(x = detector, y = prop_correct, fill = name)) +
+  geom_col(position = "dodge") + 
+  geom_text(aes(label=paste(round(prop_correct), "%")), position=position_dodge(width=0.9), hjust=-0.25) +
+  coord_flip() +
+  scale_y_continuous(name = "Correctly classified as AI-generated (%)", expand = c(.001,0), limits = c(0, 110), labels = scales::label_percent(scale = 1)) +
+  scale_fill_manual(values = c("grey", "darkred"), labels = c("Scientific Abstracts: ChatGPT-3.5 generated", "ChatGPT-3.5 w/ prompt design"))+
+  bbc_style() +
+  theme(legend.position = c(.69,.16), 
+        axis.title.y = element_blank(),
+        panel.border = element_rect(colour = "black", fill = NA), 
+        axis.ticks = element_line(colour = "black", linewidth = .7),
+        axis.text = element_text(size = 14),
+        axis.ticks.length = unit(1.7, "mm"),
+        panel.grid.major.y = element_blank(),
+        legend.text = element_text(size = 14)
+  )
+
+# grid arrange the four plots together
+
+```
+
+I can't reproduce the boxplots besides each figure in the paper because data on Text Perplexity was not present in the dataset accessed from #Tidytuesday's [github main](https://github.com/rfordatascience/tidytuesday/tree/master/data/2023/2023-07-18).
+
+# comparing performance of GPT detectors: Receiver operating characteristic (ROC) curves
+
+I found an excellent applied tutorial on what ROC curves are and most importantly how they fail [here](https://data.library.virginia.edu/roc-curves-and-auc-for-models-used-for-binary-classification/). 
+
+```{r}
+#| label: ROC-curves
+
+library(pROC)
+# vector of gpt detectors: 
+detectorVector <- c("ZeroGPT", "GPTZero", "Crossplag", "HFOpenAI", "Sapling", "Quil", "OriginalityAI")
+
+# create a variable with true outcomes: Envision a GPT detector returning 'no' if the text is Human-generated and 'yes' if AI-generated
+gpt_detectors <- gpt_detectors |> mutate(truth = if_else(model == "Human", "No", "Yes"))
+
+# write a ROC curve plotting function
+detectorROC <- function(detector) {
+ gpt_detectors_roc <- gpt_detectors |> filter(detector== !!detector)
+ROC <- roc(response = gpt_detectors_roc$truth,
+                  predictor = gpt_detectors_roc$.pred_AI,
+                  levels = c("No", "Yes"))
+ROC_coordinates <- coords(ROC, x = "all")
+d <- ggroc(ROC, legacy.axes = TRUE) +
+  labs(x = "False-positive rate", y = "True-positive rate", title = detector) + 
+  geom_area(data = ROC_coordinates, aes(x = (1-specificity), y = sensitivity), fill = "cornflowerblue", alpha = 0.5)+
+   annotate('text', x = .15, y = .8, label = paste0('AUC: ',round(auc(ROC), digits = 2))) +
+  bbc_style() +
+  # scale_x_continuous(limits = c(0,1)) +
+  # scale_y_continuous(limits = c(0,1)) +
+  theme(text = element_text(family = "Segoe UI"), legend.position = c(.69,.16), 
+        plot.title = element_text(hjust = .5, size = 12),
+        axis.title.y = element_blank(),
+        panel.border = element_rect(colour = "black", fill = NA), 
+        axis.ticks = element_line(colour = "black", linewidth = .7),
+        axis.text = element_text(size = 8),
+        axis.ticks.length = unit(0.9, "mm"),
+        panel.grid.major.y = element_blank(),
+        legend.text = element_text(size = 14)
+  )
+return(d)
+}
+
+# iterate over each element in the vector of detectors
+rocs <- purrr::map(.x = detectorVector, .f = detectorROC)
+
+# use library(patchwork) to arrange the plots
+p1 <- (rocs[[1]] + rocs[[2]] + rocs[[3]]) / (rocs[[4]] + rocs[[5]] + rocs[[6]]) / (plot_spacer() + rocs[[7]] + plot_spacer())
+
+p2 <- p1 + plot_annotation(title = "<b style = 'font-size:20pt'>**RECEIVER OPERATING CHARACTERISTIC (ROC) CURVES OF GPT DETECTORS**</b><br><span style = 'font-size:14pt'>The *Area Under the Curve* (AUC) is shaded in blue and the corresponding value is also shown. For overall classification performance in detecting AI-generated text, **GPTZero** wins.</span>",
+                           caption = "Data source: Liang et al.2023. GPT Detectors Are Biased Against Non-Native English Writers. <span style='font-family:fa-brands'>&#xf099;</span> @Emmanuelmiiro25",
+ theme = theme(title = element_markdown(family = "Segoe UI"),
+      plot.caption = element_markdown(size = 12, hjust = 0.5),
+      plot.title = element_textbox_simple(padding = margin(5.5, 5.5, 5.5, 5.5),
+                                          margin = margin(0, 0, 5.5, 0),
+                                          fill = "#F0F7FF",
+                                          halign = .5,
+                                          width = NULL)
+        ))
+
+ggsave("ROC_curves_GPT_detectors.jpeg", width = 6, height = 4, path = here::here("data", "2023", "2023-07-18"))
+
+```
